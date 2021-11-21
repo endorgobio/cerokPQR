@@ -27,6 +27,9 @@ import nltk
 nltk.download('stopwords')
 from nltk.corpus import stopwords
 
+# Save de model
+import pickle
+
 
 # 1. Read data
 data_url = 'https://docs.google.com/uc?export=download&id=1tIeykgOX81-jwrc-vYpHI-PLGTg6q5kl'
@@ -39,6 +42,17 @@ dfPQR.rename(columns={'Contenido de la PQRS' : 'Contenido',
                       'Genero Solicitante' : 'Genero'
                       },
              inplace=True) 
+
+# Correct those that contains 'riesgo de vida' but were not labaled so
+def explicit_riesgo(content, actual_riesgo):
+    if actual_riesgo == 'SI':
+        return actual_riesgo
+    elif 'riesgo de vida' in str(content):#.contains('riesgo de vida'):
+        return 'SI'
+    else:
+        return actual_riesgo
+dfPQR['Riesgo_vida'] = dfPQR.apply(lambda x: explicit_riesgo(
+    x['Contenido'], x['Riesgo_vida']), axis=1)
 
 # Remove all rows with NA in column Contenido
 dfPQR = dfPQR.dropna(subset=['Contenido'])
@@ -54,16 +68,6 @@ dfPQR["Contenido"] = dfPQR["Contenido"].str.lower()
 #dfPQR['riesgo_vida_expl'] = dfPQR['Contenido'].str.contains('riesgo de vida')
 
 
-# Correct those that contains 'riesgo de vida' but were not labaled so
-def explicit_riesgo(content, actual_riesgo):
-    if actual_riesgo == 'SI':
-        return actual_riesgo
-    elif 'riesgo de vida' in str(content):#.contains('riesgo de vida'):
-        return 'SI'
-    else:
-        return 'NO'
-dfPQR['Riesgo_vida'] = dfPQR.apply(lambda x: explicit_riesgo(
-    x['Contenido'], x['Riesgo_vida']), axis=1)
 
 # Applying encoding to the Riesgo_vida column
 #dfPQR['Riesgo_vida_encode'] = dfPQR['Riesgo_vida'].factorize()[0] 
@@ -160,6 +164,31 @@ result_grouped = result.groupby(['Riesgo_vida_textual', 'y_real', 'y_hat']).y_ha
 print(result)
 
 
+# save the model to disk
+filenameVect = 'vectorizerPQRs.sav'
+pickle.dump(pipe['vectorizer'], open(filenameVect, 'wb'))
+filenameLR = 'logRegPQRs.sav'
+pickle.dump(pipe['classifier'], open(filenameLR, 'wb'))
+
+# Cargue los modelos previamente entrenados
+vectorizer_url = 'https://docs.google.com/uc?export=download&id=1QOVxd0R7UctnUpwlDKldHgUhIPFSt32M'
+vectorizerPQRs = wget.download(vectorizer_url, 'vectorizerPQRs')
+lr_url = 'https://docs.google.com/uc?export=download&id=1y-pDeJCWM413aijsux4iMVP_bjRcE73X'
+lrPQRs = wget.download(lr_url, 'lrPQRs')
+
+loaded_vectorizer = pickle.load(open(vectorizerPQRs, 'rb'))
+loaded_logReg = pickle.load(open(lrPQRs, 'rb'))
+
+
+
+# Predicting with a test dataset
+# Create pipeline using Bag of Words
+pipe = Pipeline([('vectorizer', loaded_vectorizer),
+                 ('classifier', loaded_logReg)])
+
+
+
+#########################################################
 
 from spacy.lang.en import English
 # Definir el propio tokenizador
