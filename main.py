@@ -51,9 +51,8 @@ dfPQR = dfPQR.dropna(subset=['Riesgo_vida'])
 dfPQR["Contenido"] = dfPQR["Contenido"].str.lower()
 
 # Search for 'riesgo de vida' in the content
-dfPQR['riesgo_vida_expl'] = dfPQR['Contenido'].str.contains('riesgo de vida')
-dfPQR_riesgo = dfPQR[dfPQR['Riesgo_vida']=='SI']
-dfPQR_riesgo['riesgo_vida_expl'].sum()
+#dfPQR['riesgo_vida_expl'] = dfPQR['Contenido'].str.contains('riesgo de vida')
+
 
 # Correct those that contains 'riesgo de vida' but were not labaled so
 def explicit_riesgo(content, actual_riesgo):
