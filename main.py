@@ -172,9 +172,9 @@ pickle.dump(pipe['classifier'], open(filenameLR, 'wb'))
 
 # Cargue los modelos previamente entrenados
 vectorizer_url = 'https://docs.google.com/uc?export=download&id=1QOVxd0R7UctnUpwlDKldHgUhIPFSt32M'
-vectorizerPQRs = wget.download(vectorizer_url, 'vectorizerPQRs')
+vectorizerPQRs = wget.download(vectorizer_url, 'vectorizerPQRs.sav')
 lr_url = 'https://docs.google.com/uc?export=download&id=1y-pDeJCWM413aijsux4iMVP_bjRcE73X'
-lrPQRs = wget.download(lr_url, 'lrPQRs')
+lrPQRs = wget.download(lr_url, 'lrPQRs.sav')
 
 loaded_vectorizer = pickle.load(open(vectorizerPQRs, 'rb'))
 loaded_logReg = pickle.load(open(lrPQRs, 'rb'))
