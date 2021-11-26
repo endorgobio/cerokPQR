@@ -15,8 +15,11 @@ import seaborn as sns
 # Preprocessing and modelin
 # ==============================================================================
 import string
+import scipy 
 import spacy
 from spacy.lang.es import Spanish
+from sklearn.compose import ColumnTransformer 
+from sklearn.preprocessing import StandardScaler
 from sklearn.model_selection import train_test_split
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.linear_model import LogisticRegression
@@ -125,12 +128,52 @@ tfidf_vectorizador = TfidfVectorizer(
                         min_df     = 5,
                         stop_words = spanish_stopwords
                     )
+
+
+
+tfidf_vectorizador.fit(X_train)
+tfidf_train = tfidf_vectorizador.transform(X_train)
+tfidf_test  = tfidf_vectorizador.transform(X_test)
+
+
+
+column_trans = ColumnTransformer(
+    [('scaler', StandardScaler(), ["Edad"])],
+    remainder='passthrough') 
+data = column_trans.fit_transform(X_train)
+
+
+# Add columns
+
+new_feature  =  data[:,0]
+tfidf_train_plus = scipy.sparse.hstack([tfidf_train, new_feature])
+new_feature = dfPQR[['Edad']].sample(tfidf_test.shape[0])
+new_feature['Edad']  = np.random.rand()
+tfidf_test_plus = scipy.sparse.hstack([tfidf_test, new_feature])
+
+
+weights = {0:1, 1:2.5}
+classifier = LogisticRegression(class_weight=weights)
+
+classifier.fit(X=tfidf_train, y= y_train)
+
+predicted = classifier.predict(X=tfidf_test_plus)
+
+
+# Model Accuracy
+print("Logistic Regression Accuracy:",metrics.accuracy_score(y_test, predicted))
+print("Logistic Regression Precision:",metrics.precision_score(y_test, predicted))
+print("Logistic Regression Recall:",metrics.recall_score(y_test, predicted))
+
+###########################
+# 2. with pipeline## 
+
+
 #tfidf_vectorizador.fit(X_train)
 
 #print(tfidf_vectorizador.get_feature_names_out())
 
-weights = {0:1, 1:2.5}
-classifier = LogisticRegression(class_weight=weights)
+
 
 # Create pipeline using Bag of Words
 pipe = Pipeline([('vectorizer', tfidf_vectorizador),
