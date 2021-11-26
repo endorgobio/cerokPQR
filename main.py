@@ -80,8 +80,12 @@ dfPQR['Riesgo_vida_encode'] = [1 if x =='SI' else 0 for x in dfPQR['Riesgo_vida'
 # Se añade la stopword: amp, ax, ex
 #stop_words.extend(("amp", "xa", "xe"))
 
+# To run with less data in debug (faster)
+# dfPQR = dfPQR.sample(1000)
+
 # Consider contenido as unique regresor
 X_data = dfPQR['Contenido']
+X_data = dfPQR[['Contenido', 'Edad']]
 Y_data = dfPQR['Riesgo_vida_encode']
 
 X_train, X_test, y_train, y_test = train_test_split(
@@ -129,7 +133,23 @@ tfidf_vectorizador = TfidfVectorizer(
                         stop_words = spanish_stopwords
                     )
 
+# construct the column transfomer
+column_transformer = ColumnTransformer(
+    [('tfidf', tfidf_vectorizador, ['Contenido']), 
+    ('Scaler', StandardScaler(), ['Edad'])],
+    remainder='passthrough')
 
+data = column_transformer.fit_transform(X_train)
+
+weights = {0:1, 1:2.5}
+classifier = LogisticRegression(class_weight=weights)
+
+# fit the model
+pipe = Pipeline([
+                  ('tfidf', column_transformer),
+                  ('classify', classifier)
+                ])
+pipe.fit(X_train, y_train)
 
 tfidf_vectorizador.fit(X_train)
 tfidf_train = tfidf_vectorizador.transform(X_train)
@@ -306,3 +326,4 @@ for word in doc:
     if word.is_stop==False:
         filtered_sent.append(word)
 print("Filtered Sentence:",filtered_sent)
+
