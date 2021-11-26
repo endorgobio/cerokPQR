@@ -23,6 +23,8 @@ from sklearn.preprocessing import StandardScaler
 from sklearn.model_selection import train_test_split
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.linear_model import LogisticRegression
+from sklearn.base import BaseEstimator
+from sklearn.base import TransformerMixin
 from sklearn.pipeline import Pipeline
 from sklearn import metrics
 from sklearn.metrics import confusion_matrix
@@ -80,26 +82,7 @@ dfPQR['Riesgo_vida_encode'] = [1 if x =='SI' else 0 for x in dfPQR['Riesgo_vida'
 # Se añade la stopword: amp, ax, ex
 #stop_words.extend(("amp", "xa", "xe"))
 
-# To run with less data in debug (faster)
-# dfPQR = dfPQR.sample(1000)
 
-# Consider contenido as unique regresor
-X_data = dfPQR['Contenido']
-X_data = dfPQR[['Contenido', 'Edad']]
-Y_data = dfPQR['Riesgo_vida_encode']
-
-X_train, X_test, y_train, y_test = train_test_split(
-    X_data,
-    Y_data,
-    test_size = 0.2,
-    random_state = 42    
-)
-
-# Check distributions in train and test sets
-value, counts = np.unique(y_train, return_counts=True)
-print(dict(zip(value, 100 * counts / sum(counts))))
-value, counts = np.unique(y_test, return_counts=True)
-print(dict(zip(value, 100 * counts / sum(counts))))
 
 
 
@@ -129,14 +112,203 @@ def spacy_tokenizer(sentence):
 
 tfidf_vectorizador = TfidfVectorizer(    
                         tokenizer  = spacy_tokenizer,
-                        min_df     = 5,
+                        max_df = 1.0,
+                        min_df = 5,
                         stop_words = spanish_stopwords
                     )
 
+weights = {0:1, 1:2.5}
+classifier = LogisticRegression(class_weight=weights)
+
+#####################################################
+# 1. with only contenido as predictor  
+#####################################################
+
+# To run with less data in debug (faster)
+dfPQR = dfPQR.sample(1000)
+# Get data
+X_data = dfPQR['Contenido']
+Y_data = dfPQR['Riesgo_vida_encode']
+
+X_train, X_test, y_train, y_test = train_test_split(
+    X_data,
+    Y_data,
+    test_size = 0.2,
+    random_state = 42    
+)
+
+# Check distributions in train and test sets
+value, counts = np.unique(y_train, return_counts=True)
+print(dict(zip(value, 100 * counts / sum(counts))))
+value, counts = np.unique(y_test, return_counts=True)
+print(dict(zip(value, 100 * counts / sum(counts))))
+
+# Fit the vectorizer
+tfidf_vectorizador.fit(X_train)
+# transform X_train and X_test
+tfidf_train = tfidf_vectorizador.transform(X_train)
+tfidf_test  = tfidf_vectorizador.transform(X_test)
+
+# Fit the classifier
+classifier.fit(X=tfidf_train, y= y_train)
+
+# Get predictions
+
+predicted = classifier.predict(X=tfidf_test)
+# Model Accuracy
+print("Logistic Regression Accuracy:",metrics.accuracy_score(y_test, predicted))
+print("Logistic Regression Precision:",metrics.precision_score(y_test, predicted))
+print("Logistic Regression Recall:",metrics.recall_score(y_test, predicted))
+
+
+#####################################################
+# 2. with only contenido as predictor using pipelines 
+#####################################################
+
+# To run with less data in debug (faster)
+dfPQR = dfPQR.sample(1000)
+# Get data 
+X_data = dfPQR['Contenido']
+Y_data = dfPQR['Riesgo_vida_encode']
+
+X_train, X_test, y_train, y_test = train_test_split(
+    X_data,
+    Y_data,
+    test_size = 0.2,
+    random_state = 42    
+)
+
+# Check distributions in train and test sets
+value, counts = np.unique(y_train, return_counts=True)
+print(dict(zip(value, 100 * counts / sum(counts))))
+value, counts = np.unique(y_test, return_counts=True)
+print(dict(zip(value, 100 * counts / sum(counts))))
+
+
+# Create pipeline using tfidf_vectorizador
+pipe = Pipeline([('vectorizer', tfidf_vectorizador),
+                 ('classifier', classifier)])
+
+
+# model generation
+pipe.fit(X_train,y_train)
+
+# Predicting with a test dataset
+predicted = pipe.predict(X_test)
+
+# Model Accuracy
+print("Logistic Regression Accuracy:",metrics.accuracy_score(y_test, predicted))
+print("Logistic Regression Precision:",metrics.precision_score(y_test, predicted))
+print("Logistic Regression Recall:",metrics.recall_score(y_test, predicted))
+
+#####################################################
+# 3. with contenido and extra columns as predictors 
+#####################################################
+
+# To run with less data in debug (faster)
+dfPQR = dfPQR.sample(1000)
+# Get data 
+X_data = dfPQR[['Contenido', 'Edad']]
+Y_data = dfPQR['Riesgo_vida_encode']
+
+X_train, X_test, y_train, y_test = train_test_split(
+    X_data,
+    Y_data,
+    test_size = 0.2,
+    random_state = 42    
+)
+
+# Check distributions in train and test sets
+value, counts = np.unique(y_train, return_counts=True)
+print(dict(zip(value, 100 * counts / sum(counts))))
+value, counts = np.unique(y_test, return_counts=True)
+print(dict(zip(value, 100 * counts / sum(counts))))
+
+
+# Fit the vectorizer
+tfidf_vectorizador.fit(X_train['Contenido'])
+# transform X_train and X_test
+tfidf_train = tfidf_vectorizador.transform(X_train['Contenido'])
+tfidf_test  = tfidf_vectorizador.transform(X_test['Contenido'])
+
+numerical_trasnsf = ColumnTransformer(
+    [('scaler', StandardScaler(), ['Edad'])],
+    remainder='passthrough') 
+edad_scaled_train = numerical_trasnsf.fit_transform(X_train['Edad'].to_frame())
+edad_scaled_test = numerical_trasnsf.fit_transform(X_test['Edad'].to_frame())
+# AQUI VOY
+# Fit the classifier
+classifier.fit(X=tfidf_train, y= y_train)
+
+# Get predictions
+
+predicted = classifier.predict(X=tfidf_test)
+
+column_trans = ColumnTransformer(
+    [('scaler', StandardScaler(), ["Edad"])],
+    remainder='passthrough') 
+data = column_trans.fit_transform(X_train)
+
+new_feature  =  data[:,0]
+tfidf_train_plus = scipy.sparse.hstack([tfidf_train, new_feature])
+new_feature = dfPQR[['Edad']].sample(tfidf_test.shape[0])
+new_feature['Edad']  = np.random.rand()
+tfidf_test_plus = scipy.sparse.hstack([tfidf_test, new_feature])
+
+
+
+
+class PqrTextProcessor(BaseEstimator, TransformerMixin):
+    def __init__(self):
+        self.TfidfVectorizer = Pipeline(steps=[
+        ('tfidf', tfidf_vectorizador)    ])
+       
+        
+    def fit(self, X, y=None):
+        return self
+
+    def transform(self, X, y=None):
+       
+        return  self.TfidfVectorizer.fit_transform(X.squeeze()).toarray()
+    
+    
+numeric_transformer = Pipeline(steps=[
+    ('scaler', StandardScaler())
+])
+
+preprocessor = ColumnTransformer(transformers=[
+    ('tweet', PqrTextProcessor(), ['Contenido']),
+    ('numeric', numeric_transformer, ['Edad'])
+])
+
+
+weights = {0:1, 1:2.5}
+classifier = LogisticRegression(class_weight=weights)
+
+
+pipeline = Pipeline(steps=[
+    ('preprocessor', preprocessor),
+    ('classifier', classifier)
+])
+
+
+pipeline.fit(X_train, y_train)
+
+predicted = pipeline.predict(X=X_test)
+
+# Model Accuracy
+print("Logistic Regression Accuracy:",metrics.accuracy_score(y_test, predicted))
+print("Logistic Regression Precision:",metrics.precision_score(y_test, predicted))
+print("Logistic Regression Recall:",metrics.recall_score(y_test, predicted))
+
+
+feature_text = ['Contenido']
+feature_num = ['Edad']
 # construct the column transfomer
 column_transformer = ColumnTransformer(
-    [('tfidf', tfidf_vectorizador, ['Contenido']), 
-    ('Scaler', StandardScaler(), ['Edad'])],
+    [('tfidf', tfidf_vectorizador, feature_text), 
+    #('Scaler', StandardScaler(), feature_num)
+    ],
     remainder='passthrough')
 
 data = column_transformer.fit_transform(X_train)
@@ -185,31 +357,7 @@ print("Logistic Regression Accuracy:",metrics.accuracy_score(y_test, predicted))
 print("Logistic Regression Precision:",metrics.precision_score(y_test, predicted))
 print("Logistic Regression Recall:",metrics.recall_score(y_test, predicted))
 
-###########################
-# 2. with pipeline## 
-
-
-#tfidf_vectorizador.fit(X_train)
-
-#print(tfidf_vectorizador.get_feature_names_out())
-
-
-
-# Create pipeline using Bag of Words
-pipe = Pipeline([('vectorizer', tfidf_vectorizador),
-                 ('classifier', classifier)])
-
-
-# model generation
-pipe.fit(X_train,y_train)
-
-# Predicting with a test dataset
-predicted = pipe.predict(X_test)
-
-# Model Accuracy
-print("Logistic Regression Accuracy:",metrics.accuracy_score(y_test, predicted))
-print("Logistic Regression Precision:",metrics.precision_score(y_test, predicted))
-print("Logistic Regression Recall:",metrics.recall_score(y_test, predicted))
+# Print performance metrics
 
 
 confusion_matrix(y_true = y_test, y_pred= predicted)
@@ -326,4 +474,5 @@ for word in doc:
     if word.is_stop==False:
         filtered_sent.append(word)
 print("Filtered Sentence:",filtered_sent)
+
 
