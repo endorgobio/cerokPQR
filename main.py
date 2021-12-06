@@ -25,6 +25,8 @@ from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.linear_model import LogisticRegression
 from sklearn.base import BaseEstimator
 from sklearn.base import TransformerMixin
+from statistics import mean, stdev
+from sklearn.model_selection import StratifiedKFold
 from sklearn.pipeline import Pipeline
 from sklearn import metrics
 from sklearn.metrics import confusion_matrix
@@ -282,10 +284,65 @@ print("Logistic Regression Accuracy:",metrics.accuracy_score(y_test, predicted))
 print("Logistic Regression Precision:",metrics.precision_score(y_test, predicted))
 print("Logistic Regression Recall:",metrics.recall_score(y_test, predicted))
 
+
+
+#######
+# Hasta Aquí
+#######
+
+
+
+
+# Fit the vectorizer
+tfidf_vectorizador.fit(X_train['Contenido'])
+# transform X_train and X_test
+tfidf_train = tfidf_vectorizador.transform(X_train['Contenido'])
+tfidf_test  = tfidf_vectorizador.transform(X_test['Contenido'])
+
+numerical_trasnsf = ColumnTransformer(
+    [('scaler', MinMaxScaler(), ['Edad'])],
+    remainder='passthrough') 
+edad_scaled_train = numerical_trasnsf.fit_transform(X_train['Edad'].to_frame())
+edad_scaled_test = numerical_trasnsf.fit_transform(X_test['Edad'].to_frame())
+
+
+tfidf_train_plus = scipy.sparse.hstack([tfidf_train, edad_scaled_train])
+tfidf_test_plus = scipy.sparse.hstack([tfidf_test, edad_scaled_test])
+
+# Fit the classifier
+classifier.fit(X=tfidf_train_plus, y= y_train)
+
+# Get predictions
+
+predicted = classifier.predict(X=tfidf_test_plus)
+
+# Model Accuracy
+print("Logistic Regression Accuracy:",metrics.accuracy_score(y_test, predicted))
+print("Logistic Regression Precision:",metrics.precision_score(y_test, predicted))
+print("Logistic Regression Recall:",metrics.recall_score(y_test, predicted))
+
 #####################################################
 # 4. with contenido and extra columns as predictors using pipeline 
 #####################################################
 
+# To run with less data in debug (faster)
+# dfPQR = dfPQR.sample(1000)
+# Get data 
+X_data = dfPQR[['Contenido', 'Edad']]
+Y_data = dfPQR['Riesgo_vida_encode']
+
+X_train, X_test, y_train, y_test = train_test_split(
+    X_data,
+    Y_data,
+    test_size = 0.2,
+    random_state = 42    
+)
+
+# Check distributions in train and test sets
+value, counts = np.unique(y_train, return_counts=True)
+print(dict(zip(value, 100 * counts / sum(counts))))
+value, counts = np.unique(y_test, return_counts=True)
+print(dict(zip(value, 100 * counts / sum(counts))))
 
 column_trans = ColumnTransformer(
     [('scaler', StandardScaler(), ["Edad"])],
@@ -496,5 +553,3 @@ for word in doc:
     if word.is_stop==False:
         filtered_sent.append(word)
 print("Filtered Sentence:",filtered_sent)
-
-
